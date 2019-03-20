@@ -1,1 +1,2 @@
 focal cnn
+python fcnn_predict.py
