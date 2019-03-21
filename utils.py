@@ -115,7 +115,15 @@ def random_cut(image,n,normal_size=224):
         images.append(img)
     return images
     
-        
+
+def enhance(gray_image):
+    image=gray_image
+    for i in range(len(image)):
+        for j  in range(len(image[i])):
+            image[i][j]=int(math.pow(image[i][j],2)/255)
+
+    return image
+       
         
 def gradient(image): 
     '''
@@ -237,6 +245,7 @@ def draw_map(a,b,image,images,red=255,green=0,blue=0):
         for j in range(b,b+normal_size,1):
             #print(a,b,i,j)
             if images[i-a][j-b]>=20:
+                #print(i,j)
                 image[i][j][0]=blue
                 image[i][j][1]=green
                 image[i][j][2]=red        
@@ -257,7 +266,7 @@ def draw(images_path='./predictions/images/',image_path='./predictions/predictio
     name=[]
     for image_file in glob.glob(images_path):
         img = cv2.imread(image_file,0)
-        print(image_file)
+        #print(image_file)
         #img = cv2.resize(img,(224,224),interpolation=cv2.INTER_CUBIC)
         #img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         #print(img)   
@@ -276,9 +285,52 @@ def draw(images_path='./predictions/images/',image_path='./predictions/predictio
     for i in range(len(area)):
         for j in range(len(area[i])):
             if area[i][j]==1:
-                print(i,j)
+                #print(i,j)
+                #print(len(images),count)
                 image=draw_map(i*normal_size,j*normal_size,image,images[count],red,green,blue)     
                 count+=1        
     cv2.imwrite('./predictions/draw_image.jpg',image)
 
+
+def draw_(images_path,image_path,area_path='./predictions/area.txt',red=255,green=0,blue=0):
+    '''    
+    draw the image according to the images,area    
+    '''
+    normal_size=224
+    area=np.loadtxt(area_path)
+    images_=[]
+    images_path = os.path.join(images_path, '*.jpg')
+    name=[]
+    for image_file in glob.glob(images_path):
+        img = cv2.imread(image_file,0)
+        #print(image_file)
+        #img = cv2.resize(img,(224,224),interpolation=cv2.INTER_CUBIC)
+        #img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        #print(img)   
+        img=gradient(img)
+        images_.append(img)      
+        label = int(image_file.split('_')[-2].split('_')[-1])
+        name.append(label)  
+    images=[]
+    for i in range(len(name)):
+        for j in range(len(name)):
+            if name[j] ==i:
+                images.append(images_[j])
+    #sort
+    image=cv2.imread(image_path)
+    image = cv2.resize(image,(len(area)*normal_size,len(area)*normal_size),interpolation=cv2.INTER_CUBIC)
+    
+    count=0
+    for i in range(len(area)):
+        for j in range(len(area[i])):
+            if area[i][j]==1:
+                #print(i,j)
+                #print(len(images),count)
+                image=draw_map(i*normal_size,j*normal_size,image,images[count],red,green,blue)     
+                count+=1        
+    cv2.imwrite('./predictions/draw_image.jpg',image)
+
+    
+    
+    
     

@@ -12,7 +12,7 @@ from optparse import OptionParser
 
 def get_args():
     parser = OptionParser()
-    parser.add_option('-d', '--img_dir', dest='img_dir', default='./test/2.jpg', 
+    parser.add_option('-d', '--img_dir', dest='img_dir', default='./test/3.jpg', 
                       help='number of epochs')
     parser.add_option('-m', '--model_path', dest='model_path', default='./outputs-0.ckpt/0-81600',
                       type='string', help='batch size')
@@ -46,7 +46,9 @@ if __name__ == '__main__':
     graph=[]
     array=[]
     count=0
-
+    #print(ans)
+    #print(len(ans))
+    #print(stop)
 
     if args.focal_degree==0:
         for i in range(len(ans)):    
@@ -74,6 +76,7 @@ if __name__ == '__main__':
         cv2.imwrite('./predictions/prediction.jpg',image)
         f.close()
         drawing=utils.draw()
+        drawing2=utils.draw_(images_path='./predictions/images/',image_path=path,area_path='./predictions/area.txt',red=255,green=0,blue=0)
 
        
         
@@ -81,6 +84,22 @@ if __name__ == '__main__':
                     
                     
     else: 
+        for i in range(len(ans)):    
+            array.append(ans[i])
+            count+=1
+            if count%stop ==0:
+                
+                graph.append(array)
+                array=[]
+                
+        f = open("./predictions/area.txt",'w')        
+        for i in range(len(graph)):
+            print(graph[i]) 
+            for j in range(len(graph[i])):
+                #graph[i][j] = str(graph[i][j]).encode('utf-8')
+                f.write(str(graph[i][j]))
+                f.write(' ')
+            f.write('\n')
         
         for i in range(len(images_)):
             #print(images_[i])
@@ -88,5 +107,8 @@ if __name__ == '__main__':
             #  print(semantic_cnn.confidence(logits_dict[i][0]))
             cv2.imwrite(pic_name,images_[i])
         cv2.imwrite('./predictions/prediction.jpg',image)
+        f.close()
+        drawing=utils.draw()
+        
         print("successfully save!")
         print('The functions is not finished!')
