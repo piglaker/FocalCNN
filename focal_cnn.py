@@ -7,11 +7,145 @@ Created on Sat Mar  9 16:48:46 2019
 
 import tensorflow as tf
 import cv2
-import utils
+import utils2
+import numpy as np
+import glob
+import os
+import shutil
 #normal_size=1296
 #cv2.rectangle(img,(x,y),(x2,y2),(0,255,0),width)
+def stare(images_path='./strange',output_dir='./predictions',map_='./strange',model_path='./outputs-0.ckpt/0-81600',n=5,normal_size=224,focal_degree=0,method='quick',review=False,photo='raw',admin=False):
+    '''
+    map_ shall be :     x1,y1
+                        x2,y2
+                        x3,y3
+                        
+    '''
+    map_=np.loadtxt(map_)
+    predicted_label_dict=[]  # predictedlabel
+    predicted_logits_dict=[] #predicted logits 
+    images_1=[]#1 images(crack)
+    logits_dict=[]#logits
+    images=[]
+    if not os.path.exists(images_path):
+        raise ValueError('images_path is not exist.')    
+    Images = []
+    images_path = os.path.join(images_path, '*.jpg')
+    count = 0
+    for image_file in glob.glob(images_path):
+        count += 1
+        if count % 100 == 0:
+            print('Load {} images.'.format(count))
+        image = cv2.imread(image_file)
+        Images.append(image)
+    Images = np.array(Images)
+    k=0    
+    predicted_label_dict=[]
+    predicted_logits_dict=[]
+    with tf.Session() as sess:
+        ckpt_path = model_path
+        saver = tf.train.import_meta_graph(ckpt_path + '.meta')
+        saver.restore(sess, ckpt_path)   
+        inputs = tf.get_default_graph().get_tensor_by_name('inputs:0')       
+        classes = tf.get_default_graph().get_tensor_by_name('classes:0') 
+        logits = tf.get_default_graph().get_tensor_by_name('logits:0')#logits                          
+        for i in range(len(Images)):              
+            cv2.imwrite(output_dir+'/'+str(k)+'/image'+'.jpg',image)
+            map_=np.loadtxt('./target/'+str(k)+'.txt')
+            for j in range(len(map_)):
+                img=utils2.copy(map_[j][0],map_[j][1],map_[j][2],map_[j][3],Images[i])
+                images.append(img)
+            for i in range(len(images)):
+                I=cv2.resize(images[i],(224,224),interpolation=cv2.INTER_CUBIC)
+                image_batch=[I]                                         
+                predicted_label = sess.run(classes, feed_dict={inputs: image_batch})
+                predicted_label_dict.append(predicted_label)
+                predicted_logits = sess.run(logits, feed_dict={inputs: image_batch})
+                predicted_logits_dict.append(predicted_logits)      
+            
+            if os.path.exists(output_dir+'/'+str(k)):
+                shutil.rmtree(output_dir+'/'+str(k))
+            os.makedirs(output_dir+'/'+str(k))
+            
+            for i in range(len(images)):                    
+                if predicted_label_dict[i]==1:               
+                    logits_dict.append(predicted_logits_dict[i])
+                    images_1.append(images[i])
+                    cv2.rectangle(image,(map_[j][0],map_[j][1]),(map_[j][2],map_[j][3]),(0,255,0),3)
+                    cv2.imwrite(output_dir+'/'+str(k)+'/'+str(i)+'.jpg',images[i])
+            
+            cv2.imwrite(output_dir+'/'+str(k)+'/image.jpg',image)
 
-def detection(image,model_path,n,normal_size=224,focal_degree=0,method='quick',review=False,photo='gradient'):
+            images.clear()          
+            predicted_label_dict.clear()
+            k+=1  
+
+
+
+def browse(images_path='./test',output_dir='./store',model_path='./outputs-0.ckpt/0-81600',n=5,normal_size=224,focal_degree=0,method='quick',review=False,photo='raw',admin=False):
+    '''
+    designed for numerous images    
+    it will output the result to the output_dir like:
+        0 : area img1(2) img2(box ,label)
+        1
+        2
+        3
+        ...       
+    '''
+    area=[]   # matrix of 0 1
+    predicted_label_dict=[]  # predictedlabel
+    predicted_logits_dict=[] #predicted logits 
+    images_1=[]#1 images(crack)
+    logits_dict=[]#logits
+    launch=n*normal_size  
+    if not os.path.exists(images_path):
+        raise ValueError('images_path is not exist.')    
+    Images = []
+    images_path = os.path.join(images_path, '*.jpg')
+    count = 0
+    for image_file in glob.glob(images_path):
+        count += 1
+        if count % 100 == 0:
+            print('Load {} images.'.format(count))
+        image = cv2.imread(image_file)
+        Images.append(image)
+    Images = np.array(Images)
+    k=0    
+    predicted_label_dict=[]
+    predicted_logits_dict=[]
+    with tf.Session() as sess:
+        ckpt_path = model_path
+        saver = tf.train.import_meta_graph(ckpt_path + '.meta')
+        saver.restore(sess, ckpt_path)   
+        inputs = tf.get_default_graph().get_tensor_by_name('inputs:0')       
+        classes = tf.get_default_graph().get_tensor_by_name('classes:0') 
+        logits = tf.get_default_graph().get_tensor_by_name('logits:0')#logits                          
+        for i in range(len(Images)):  
+            for j in range(n*n):
+                area.append(0)
+            image = cv2.resize(Images[i],(launch,launch),interpolation=cv2.INTER_CUBIC)
+            cv2.imwrite(output_dir+'/'+str(k)+'/image'+'.jpg',image)
+            images=utils2.pic_cut(image,n,normal_size=224)                                      
+            for i in range(len(images)):
+                image_batch=[images[i]]                                         
+                predicted_label = sess.run(classes, feed_dict={inputs: image_batch})
+                predicted_label_dict.append(predicted_label)
+                predicted_logits = sess.run(logits, feed_dict={inputs: image_batch})
+                predicted_logits_dict.append(predicted_logits)
+            packed_images=utils2.pack_images_up(images,photo)
+            
+            
+            area,image,logits_dict,images_1=utils2.resort(area,packed_images,predicted_label_dict,predicted_logits_dict,image)
+            utils2.record(k,area,packed_images,image,output_dir)
+            
+            area.clear()           
+            predicted_label_dict.clear()
+            k+=1
+    
+
+
+
+def detection(image,model_path,n,normal_size=224,focal_degree=0,method='quick',review=False,photo='gradient',admin=False):
     '''   
     inputs:image
            model_path
@@ -21,10 +155,12 @@ def detection(image,model_path,n,normal_size=224,focal_degree=0,method='quick',r
             method
             review or not
             gradient or not
+            administer or not
     outputs:area(express crack of the image)
             image:labeled image
             images_:gradient target
-            logits_dict: logits of the target
+            logits_dict: logits of the 
+            area:a map of the target in the image
     '''
     stop=0 
     area=[]   # matrix of 0 1
@@ -34,32 +170,23 @@ def detection(image,model_path,n,normal_size=224,focal_degree=0,method='quick',r
     images_0=[]#0 images(none)
     logits_dict=[]#logits
     launch=n*normal_size
-    
-    for i in range(n*n):
-        area.append(0)   
-        
-    
-    #judge=select_judge(method)    
     if focal_degree!=0:
         #自动对焦模式
-        print('Focal starts!It will take longer time...')
-        area,image,logits_dict,images_1,stop=focal(image,model_path,focal_degree,photo)        
-    
-        return area,image,logits_dict,images_1,stop
-    
+        print('Focal starts ! It will take longer time...')      
+        area,image,logits_dict,images_1,stop=focal(image,model_path,focal_degree,photo,admin)          
+        return area,image,logits_dict,images_1,stop    
     else:       
         image = cv2.resize(image,(launch,launch),interpolation=cv2.INTER_CUBIC)
-        images=utils.pic_cut(image,n,normal_size=224)
-    
+        images=utils2.pic_cut(image,n,normal_size=224)      
+    for i in range(n*n):
+        area.append(0)   
+    #make the map    
+    #标准模式
     if method !='quick':
-        print('sorry,deep-method is still in fucking testing' )
-  
-    if method=='quick':               
-            
+        print('sorry,deep-method is still in fucking testing' ) 
+    if method=='quick':                           
         predicted_label_dict,predicted_logits_dict=cnn_predict(images,model_path)#predict
-        #predict    
-    
-        packed_images=utils.pack_images_up(images,photo)
+        packed_images=utils2.pack_images_up(images,photo)
         '''     
         for i in range(len(packed_images)):                    
             if predicted_label_dict[i]==1:               
@@ -72,24 +199,18 @@ def detection(image,model_path,n,normal_size=224,focal_degree=0,method='quick',r
             else:
                 images_0.append(images[i])
         '''
-        area,image,logits_dict,images_1=utils.resort(area,packed_images,predicted_label_dict,predicted_logits_dict,image)
-            
+        area,image,logits_dict,images_1=utils2.resort(area,packed_images,predicted_label_dict,predicted_logits_dict,image)      
     else:
         '''
         deep:
         muilt-random-detection
         '''
         raw_image=0
-        raw_image=image
-        #cv2.imshow('0',raw_image)
-        #cv2.waitKey(0)
-        
+        raw_image=image   
         predicted_label_dict,predicted_logits_dict=cnn_predict(images,model_path)#predict
-        #predict             
-        
-        packed_images=utils.pack_images_up(images,photo)
-        
-        
+        #predict       
+        packed_images=utils2.pack_images_up(images,photo)
+        #need reconsitution here
         for i in range(len(images)):                    
             if predicted_label_dict[i]==1:               
                 area[i]=1
@@ -101,7 +222,7 @@ def detection(image,model_path,n,normal_size=224,focal_degree=0,method='quick',r
             else:
                 images_0.append(images[i])
                 
-        target,avg_confidence=utils.confidence(predicted_label_dict,predicted_logits_dict)
+        target,avg_confidence=utils2.confidence(predicted_label_dict,predicted_logits_dict)
                 
         print(target,avg_confidence)
                 
@@ -118,18 +239,18 @@ def detection(image,model_path,n,normal_size=224,focal_degree=0,method='quick',r
             
         
             for i in range(0,patience+n,1):
-                random_image,x,y=utils.random_cut_(raw_image,normal_size)  
+                random_image,x,y=utils2.random_cut_(raw_image,normal_size)  
                 #cv2.imshow('0',random_image)
                 
                 label = sess.run(classes, feed_dict={inputs: [random_image]})
                 logits_ = sess.run(logits, feed_dict={inputs: [random_image]})
                                 
-                print(utils.confidence_(logits_[0]))
+                print(utils2.confidence_(logits_[0]))
                     
                 if label==1:
-                    if utils.confidence_(logits_[0])>avg_confidence:
+                    if utils2.confidence_(logits_[0])>avg_confidence:
                         cv2.rectangle(image,(x,y),(x+normal_size,y+normal_size),(255,255,0),3)
-                        images_1.append(utils.pack_image_up_(random_image,photo))                             
+                        images_1.append(utils2.pack_image_up_(random_image,photo))                             
                         logits_dict.append(logits_)
                                      
        
@@ -210,7 +331,7 @@ def deep_judge(logits,images_,):
 '''
 
 
-def focal(image,model_path,focal_length,photo='raw'):
+def focal(image,model_path,focal_length,photo='raw',model='quick',admin=False):
     '''
     focue_detection:
         auto for best cut search
@@ -240,7 +361,8 @@ def focal(image,model_path,focal_length,photo='raw'):
     images_=[]
     predicted_label_dict_=[]
     predicted_logits_dict_=[]       
-    model=input('Input the model you prefer (you hava to select quick or slow):')    
+    if admin==True:
+        model=input('Input the model you prefer (you hava to select quick or slow):')    
     #preference = input('Input the preference (you hava to select accuray or amount):')        
     with tf.Session() as sess:
         ckpt_path = model_path
@@ -259,7 +381,7 @@ def focal(image,model_path,focal_length,photo='raw'):
                     predicted_logits_dict.clear()
                     launch=i*normal_size #  
                     image = cv2.resize(raw_image,(launch,launch),interpolation=cv2.INTER_CUBIC)
-                    images=utils.pic_cut(image,i,normal_size=224)                               
+                    images=utils2.pic_cut(image,i,normal_size=224)                               
                     #predicted_label_dict,predicted_logits_dict=cnn_predict(images,model_path)                        
                     ''' 
                     if len(images)<50:
@@ -296,7 +418,7 @@ def focal(image,model_path,focal_length,photo='raw'):
                         if predicted_label_dict[j]==1:
                             target+=1
                             #print(predicted_logits_dict[j])
-                            score=score+utils.confidence_(predicted_logits_dict[j][0])
+                            score=score+utils2.confidence_(predicted_logits_dict[j][0])
                             avg_score=score/target
                     print(target,avg_score,i)
                     if i==2 :
@@ -310,7 +432,7 @@ def focal(image,model_path,focal_length,photo='raw'):
                         predicted_label_dict_=predicted_label_dict
                         predicted_logits_dict_=predicted_logits_dict
                         stop=i
-                        if utils.gradient_function(max_target,max_avg_score,target,avg_score,preference='accuracy'):
+                        if utils2.gradient_function(max_target,max_avg_score,target,avg_score,preference='accuracy'):
                             break
                         else :
                             max_avg_score=avg_score
@@ -325,7 +447,7 @@ def focal(image,model_path,focal_length,photo='raw'):
                 predicted_logits_dict.clear()
                 launch=i*normal_size #  
                 image = cv2.resize(raw_image,(launch,launch),interpolation=cv2.INTER_CUBIC)
-                images=utils.pic_cut(image,i,normal_size=224)                          
+                images=utils2.pic_cut(image,i,normal_size=224)                          
                 #predicted_label_dict,predicted_logits_dict=cnn_predict(images,model_path)                            
                 '''
                 if len(images)<50:
@@ -362,7 +484,7 @@ def focal(image,model_path,focal_length,photo='raw'):
                     if predicted_label_dict[j]==1:
                         target+=1
                         #print(predicted_logits_dict[j])
-                        score=score+utils.confidence_(predicted_logits_dict[j][0])
+                        score=score+utils2.confidence_(predicted_logits_dict[j][0])
                         avg_score=score/target
                 print(target,avg_score,i)
                 if i==2 :   
@@ -376,11 +498,11 @@ def focal(image,model_path,focal_length,photo='raw'):
                     predicted_label_dict_=predicted_label_dict
                     predicted_logits_dict_=predicted_logits_dict
                     stop=i
-                    if utils.max_function(max_target,max_avg_score,target,avg_score,preference='accuracy'):
+                    if utils2.max_function(max_target,max_avg_score,target,avg_score,preference='accuracy'):
                         max_avg_score=avg_score
                         max_target=target
        
-    images_=utils.pack_images_up(images_,photo)          
+    images_=utils2.pack_images_up(images_,photo)          
     for i in range(stop*stop):
         area.append(0)    
     launch=stop*normal_size #  

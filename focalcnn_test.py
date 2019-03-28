@@ -5,6 +5,12 @@ import cv2
 import focal_cnn
 import utils
 import tensorflow as tf
+'''
+
+弃用！！！
+out of time！！！
+
+'''
 
 
 model_path="E:\\zxtdeeplearning\\crack\\model\\outputs-0.ckpt\\0-81600"
@@ -16,12 +22,8 @@ def main(_):
     #img_path = input('Input the path (you hava to put the test_pic in a file):')
     img_path="E:\\zxtdeeplearning\\crack\\model\\2.jpg"
     img=cv2.imread(img_path)
-
-    stop=0
-    
-    
-    ans,image,logits_dict,images_,stop=focal_cnn.detection(img,model_path,precision=6,normal_size=224,focal_degree=0,method='quick',rewiew=False,photo='gradient')
-    
+    stop=0  
+    ans,image,logits_dict,images_,stop=focal_cnn.detection(img,model_path,precision=6,normal_size=224,focal_degree=0,method='quick',rewiew=False,photo='gradient')  
     print(ans)
     graph=[]
     array=[]
